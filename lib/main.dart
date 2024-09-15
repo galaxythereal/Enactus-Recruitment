@@ -1,3 +1,5 @@
+// ignore_for_file: unrelated_type_equality_checks, avoid_print, library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -47,7 +49,7 @@ Future<void> syncDataToGoogleSheets() async {
   if (connectivityResult == ConnectivityResult.none) return;
 
   const sheetUrl =
-      'https://script.google.com/macros/s/AKfycbz7tN6Dx7G7JPr-B-nwBV1bpqTyDAGvIMYZqFk1xv7cuY2_Z-2MbvGy8IIUoiI2HIyB/exec';
+      'https://script.google.com/macros/s/AKfycbyiyg4k8zBlJIvTvS-v8-CyymvK-nbgX5bR1NYlNsOK0kaPpIs_DfWU3bOho660-XQx/exec';
 
   for (var appJson in applications) {
     try {
@@ -168,20 +170,34 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
     await Workmanager().registerPeriodicTask(
       "syncData",
       "syncData",
-      frequency: Duration(minutes: 15),
+      frequency: const Duration(minutes: 15),
     );
   }
+// https://script.google.com/macros/s/AKfycbyiyg4k8zBlJIvTvS-v8-CyymvK-nbgX5bR1NYlNsOK0kaPpIs_DfWU3bOho660-XQx/exec
 
   Future<void> _syncApplicationToGoogleSheets(Application application) async {
-    final sheetUrl =
-        'https://script.google.com/macros/s/AKfycbz7tN6Dx7G7JPr-B-nwBV1bpqTyDAGvIMYZqFk1xv7cuY2_Z-2MbvGy8IIUoiI2HIyB/exec';
+    const sheetUrl =
+        'https://script.google.com/macros/s/AKfycbyiyg4k8zBlJIvTvS-v8-CyymvK-nbgX5bR1NYlNsOK0kaPpIs_DfWU3bOho660-XQx/exec';
     try {
       final response = await http.post(
         Uri.parse(sheetUrl),
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode(application.toJson()),
       );
 
-      if (response.statusCode != 200) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'success') {
+          print('Data synced successfully: ${responseData['message']}');
+        } else {
+          print('Error syncing data: ${responseData['message']}');
+          _savePendingApplication(application);
+        }
+      } else {
+        print('Error syncing data: HTTP ${response.statusCode}');
         _savePendingApplication(application);
       }
     } catch (e) {
@@ -251,7 +267,7 @@ class HomePage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SvgPicture.network(
-              'https://i.postimg.cc/vHHvd73x/Untitled-3.png',
+              'assets/Enactus-Menufiya-Logo.svg',
               height: 150,
               placeholderBuilder: (BuildContext context) =>
                   const CircularProgressIndicator(),
@@ -260,7 +276,8 @@ class HomePage extends StatelessWidget {
             ElevatedButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => RegistrationPage()),
+                MaterialPageRoute(
+                    builder: (context) => const RegistrationPage()),
               ),
               style: ElevatedButton.styleFrom(
                 padding:
@@ -290,6 +307,8 @@ class HomePage extends StatelessWidget {
 }
 
 class RegistrationPage extends ConsumerStatefulWidget {
+  const RegistrationPage({super.key});
+
   @override
   _RegistrationPageState createState() => _RegistrationPageState();
 }
