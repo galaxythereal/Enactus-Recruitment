@@ -49,7 +49,7 @@ Future<void> syncDataToGoogleSheets() async {
   if (connectivityResult == ConnectivityResult.none) return;
 
   const sheetUrl =
-      'https://script.google.com/macros/s/AKfycbyiyg4k8zBlJIvTvS-v8-CyymvK-nbgX5bR1NYlNsOK0kaPpIs_DfWU3bOho660-XQx/exec';
+      'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec';
 
   for (var appJson in applications) {
     try {
@@ -85,6 +85,41 @@ final applicationsProvider =
   return ApplicationsNotifier(ref.watch(sharedPreferencesProvider));
 });
 
+final recruiterLeaderboardProvider =
+    StateNotifierProvider<RecruiterLeaderboardNotifier, List<RecruiterStats>>(
+        (ref) {
+  return RecruiterLeaderboardNotifier();
+});
+
+class RecruiterStats {
+  final String name;
+  final int recruitCount;
+
+  RecruiterStats({required this.name, required this.recruitCount});
+}
+
+class RecruiterLeaderboardNotifier extends StateNotifier<List<RecruiterStats>> {
+  RecruiterLeaderboardNotifier() : super([]);
+
+  Future<void> fetchLeaderboard() async {
+    try {
+      final response = await http.get(Uri.parse(
+          'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec?action=getLeaderboard'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        state = data
+            .map((item) => RecruiterStats(
+                  name: item['recruiter'],
+                  recruitCount: item['count'],
+                ))
+            .toList();
+      }
+    } catch (e) {
+      print('Error fetching leaderboard: $e');
+    }
+  }
+}
+
 // Models
 class Application {
   final String id;
@@ -95,6 +130,7 @@ class Application {
   final String committee;
   final DateTime timestamp;
   final String? profileImagePath;
+  final String recruiter;
 
   Application({
     required this.id,
@@ -105,6 +141,7 @@ class Application {
     required this.committee,
     required this.timestamp,
     this.profileImagePath,
+    required this.recruiter,
   });
 
   factory Application.fromJson(Map<String, dynamic> json) {
@@ -117,6 +154,7 @@ class Application {
       committee: json['committee'],
       timestamp: DateTime.parse(json['timestamp']),
       profileImagePath: json['profileImagePath'],
+      recruiter: json['recruiter'] ?? '',
     );
   }
 
@@ -130,6 +168,7 @@ class Application {
       'committee': committee,
       'timestamp': timestamp.toIso8601String(),
       'profileImagePath': profileImagePath,
+      'recruiter': recruiter,
     };
   }
 }
@@ -165,39 +204,18 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
     } else {
       _savePendingApplication(application);
     }
-
-    // Schedule periodic sync
-    await Workmanager().registerPeriodicTask(
-      "syncData",
-      "syncData",
-      frequency: const Duration(minutes: 15),
-    );
   }
-// https://script.google.com/macros/s/AKfycbyiyg4k8zBlJIvTvS-v8-CyymvK-nbgX5bR1NYlNsOK0kaPpIs_DfWU3bOho660-XQx/exec
 
   Future<void> _syncApplicationToGoogleSheets(Application application) async {
     const sheetUrl =
-        'https://script.google.com/macros/s/AKfycbyiyg4k8zBlJIvTvS-v8-CyymvK-nbgX5bR1NYlNsOK0kaPpIs_DfWU3bOho660-XQx/exec';
+        'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec';
     try {
       final response = await http.post(
         Uri.parse(sheetUrl),
-        headers: {"Content-Type": "application/json"},
         body: jsonEncode(application.toJson()),
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        if (responseData['status'] == 'success') {
-          print('Data synced successfully: ${responseData['message']}');
-        } else {
-          print('Error syncing data: ${responseData['message']}');
-          _savePendingApplication(application);
-        }
-      } else {
-        print('Error syncing data: HTTP ${response.statusCode}');
+      if (response.statusCode != 200) {
         _savePendingApplication(application);
       }
     } catch (e) {
@@ -210,6 +228,44 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
     final pendingApps = _prefs.getStringList('pendingApplications') ?? [];
     pendingApps.add(jsonEncode(application.toJson()));
     _prefs.setStringList('pendingApplications', pendingApps);
+  }
+
+  Future<bool> syncPendingApplications() async {
+    final pendingApps = _prefs.getStringList('pendingApplications') ?? [];
+
+    if (pendingApps.isEmpty) return true;
+
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      throw Exception('No internet connection');
+    }
+
+    const sheetUrl =
+        'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec';
+    List<String> successfulSyncs = [];
+
+    for (var appJson in pendingApps) {
+      try {
+        final response = await http.post(
+          Uri.parse(sheetUrl),
+          body: appJson,
+        );
+
+        if (response.statusCode == 200) {
+          successfulSyncs.add(appJson);
+        }
+      } catch (e) {
+        print('Error syncing data: $e');
+      }
+    }
+
+    // Remove successfully synced applications
+    for (var syncedApp in successfulSyncs) {
+      pendingApps.remove(syncedApp);
+    }
+
+    await _prefs.setStringList('pendingApplications', pendingApps);
+    return pendingApps.isEmpty;
   }
 
   void removeApplication(String id) {
@@ -253,6 +309,14 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Enactus Recruitment'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.leaderboard),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const RecruiterLeaderboardPage()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.push(
@@ -313,11 +377,54 @@ class RegistrationPage extends ConsumerStatefulWidget {
   _RegistrationPageState createState() => _RegistrationPageState();
 }
 
+// Add this new widget
+class RecruiterLeaderboardPage extends ConsumerStatefulWidget {
+  const RecruiterLeaderboardPage({super.key});
+
+  @override
+  _RecruiterLeaderboardPageState createState() =>
+      _RecruiterLeaderboardPageState();
+}
+
+class _RecruiterLeaderboardPageState
+    extends ConsumerState<RecruiterLeaderboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    ref.read(recruiterLeaderboardProvider.notifier).fetchLeaderboard();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final leaderboard = ref.watch(recruiterLeaderboardProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Recruiter Leaderboard')),
+      body: RefreshIndicator(
+        onRefresh: () =>
+            ref.read(recruiterLeaderboardProvider.notifier).fetchLeaderboard(),
+        child: ListView.builder(
+          itemCount: leaderboard.length,
+          itemBuilder: (context, index) {
+            final stats = leaderboard[index];
+            return ListTile(
+              leading: CircleAvatar(child: Text('${index + 1}')),
+              title: Text(stats.name),
+              trailing: Text('${stats.recruitCount} recruits'),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _RegistrationPageState extends ConsumerState<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _recruiterController = TextEditingController();
   final TextEditingController _collegeController = TextEditingController();
   String _selectedCommittee = '';
   bool _isLoading = false;
@@ -569,12 +676,13 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
         final newApplication = Application(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text,
-          email: _emailController.text + _selectedEmailSuffix,
+          email: '${_emailController.text}$_selectedEmailSuffix',
           phone: _phoneController.text,
           college: _collegeController.text,
           committee: _selectedCommittee,
           timestamp: DateTime.now(),
           profileImagePath: profileImagePath,
+          recruiter: _recruiterController.text,
         );
 
         await ref
@@ -585,7 +693,7 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
         if (!_registeredColleges.contains(_collegeController.text)) {
           _registeredColleges.add(_collegeController.text);
           final prefs = ref.read(sharedPreferencesProvider);
-          prefs.setStringList('registeredColleges', _registeredColleges);
+          await prefs.setStringList('registeredColleges', _registeredColleges);
         }
 
         setState(() {
@@ -782,6 +890,23 @@ class AdminDashboardPage extends ConsumerWidget {
               'Recent Applications',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref
+                    .read(applicationsProvider.notifier)
+                    .syncPendingApplications();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sync completed successfully')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Sync failed: ${e.toString()}')),
+                );
+              }
+            },
+            child: const Text('Sync Pending Applications'),
           ),
           ListView.builder(
             shrinkWrap: true,
