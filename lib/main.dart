@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+// ignore: unused_import
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:convert';
@@ -14,6 +15,23 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:workmanager/workmanager.dart';
+
+// Add these constants at the top of your file
+// Sophisticated color palette for a professional recruiting tool
+const Color kPrimaryColor = Color(0xFF1E88E5);
+const Color kSecondaryColor = Color(0xFF42A5F5);
+const Color kAccentColor = Color(0xFF64B5F6);
+const Color kBackgroundColor = Color(0xFFF5F5F5);
+const Color kCardColor = Colors.white;
+const Color kTextColor = Color(0xFF333333);
+const Color kSubtitleColor = Color(0xFF757575);
+// const Color kPrimaryColor = Color(0xFFD2B48C);  // Beige
+// const Color kSecondaryColor = Color(0xFFB5A57D);  // Muted beige for secondary elements
+// const Color kAccentColor = Color(0xFF7D674C);  // Darker beige accent
+// const Color kBackgroundColor = Color(0xFFF8F4E3);  // Light beige background
+// const Color kCardColor = Color(0xFFF5F0DC);  // Lighter beige for cards
+// const Color kTextColor = Color(0xFF4B4B4B);  // Darker gray-brown for text
+// const Color kSubtitleColor = Color(0xFF8A7E6D);  // Muted brown-gray for subtitles
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +67,7 @@ Future<void> syncDataToGoogleSheets() async {
   if (connectivityResult == ConnectivityResult.none) return;
 
   const sheetUrl =
-      'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec';
+      'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec';
 
   for (var appJson in applications) {
     try {
@@ -104,7 +122,7 @@ class RecruiterLeaderboardNotifier extends StateNotifier<List<RecruiterStats>> {
   Future<void> fetchLeaderboard() async {
     try {
       final response = await http.get(Uri.parse(
-          'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec?action=getLeaderboard'));
+          'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec?action=getLeaderboard'));
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         state = data
@@ -208,7 +226,7 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
 
   Future<void> _syncApplicationToGoogleSheets(Application application) async {
     const sheetUrl =
-        'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec';
+        'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec';
     try {
       final response = await http.post(
         Uri.parse(sheetUrl),
@@ -241,7 +259,7 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
     }
 
     const sheetUrl =
-        'https://script.google.com/macros/s/AKfycbyQip1dhVX7cuk_KgGzQYrhgKQK5SKOcwQ_OvlQZ8e76VnsB5UKVMjrw65fLpUMFDji/exec';
+        'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec';
     List<String> successfulSyncs = [];
 
     for (var appJson in pendingApps) {
@@ -284,87 +302,531 @@ class EnactusRecruitmentApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Enactus Recruitment',
       themeMode: themeMode,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        textTheme: GoogleFonts.poppinsTextTheme(
-          Theme.of(context).textTheme,
-        ),
-      ),
-      darkTheme: ThemeData.dark().copyWith(
-        textTheme: GoogleFonts.poppinsTextTheme(
-          ThemeData.dark().textTheme,
-        ),
-      ),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
       home: const HomePage(),
+    );
+  }
+
+  ThemeData _buildTheme(Brightness brightness) {
+    var baseTheme =
+        brightness == Brightness.light ? ThemeData.light() : ThemeData.dark();
+
+    return baseTheme.copyWith(
+      primaryColor: kPrimaryColor,
+      scaffoldBackgroundColor: brightness == Brightness.light
+          ? kBackgroundColor
+          : const Color(0xFF1A1A1A),
+      cardColor:
+          brightness == Brightness.light ? kCardColor : const Color(0xFF2D2D2D),
+      colorScheme: ColorScheme.fromSwatch().copyWith(
+        secondary: kSecondaryColor,
+        brightness: brightness,
+      ),
+      textTheme: GoogleFonts.poppinsTextTheme(baseTheme.textTheme),
+      cardTheme: CardTheme(
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        clipBehavior: Clip.antiAlias,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 4,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
+
+  @override
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.5),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Enactus Recruitment'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.leaderboard),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const RecruiterLeaderboardPage()),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 200.0,
+            floating: false,
+            pinned: true,
+            stretch: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    'https://i.postimg.cc/x84T6xRZ/IMG-7344-topaz-faceai-sharpen.jpg',
+                    fit: BoxFit.cover,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Enactus Menoufia Recruitment',
+                          style: GoogleFonts.poppins(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'One Team One Dream.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.leaderboard, color: Colors.white),
+                onPressed: () =>
+                    _navigateWithAnimation(const RecruiterLeaderboardPage()),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings, color: Colors.white),
+                onPressed: () => _navigateWithAnimation(const SettingsPage()),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SettingsPage()),
+          SliverToBoxAdapter(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, Recruiter',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: kPrimaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Empower change through recruitment',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: kSubtitleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: _buildFeatureCard(
+                          title: 'Register New Recruit',
+                          subtitle: 'Add a new member to Enactus Menoufia',
+                          icon: Icons.person_add,
+                          onTap: () =>
+                              _navigateWithAnimation(const RegistrationPage()),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildRecruiterTools(),
+                      const SizedBox(height: 24),
+                      _buildRecentActivity(),
+                      const SizedBox(height: 24),
+                      _buildTributeBanner(),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SvgPicture.network(
-              'assets/Enactus-Menufiya-Logo.svg',
-              height: 150,
-              placeholderBuilder: (BuildContext context) =>
-                  const CircularProgressIndicator(),
+    );
+  }
+
+  Widget _buildFeatureCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity, // This makes the card take full width
+      child: Card(
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [kPrimaryColor, kSecondaryColor],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const RegistrationPage()),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: onTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: kPrimaryColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: Text(
+                      'Get Started',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                textStyle: const TextStyle(fontSize: 18),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecruiterTools() {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recruiter Tools',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: kTextColor,
               ),
-              child: const Text('Apply Now'),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AdminLoginPage()),
-              ),
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                textStyle: const TextStyle(fontSize: 18),
-              ),
-              child: const Text('Admin Login'),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildToolButton(
+                    icon: Icons.sync,
+                    label: 'Sync Data',
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(applicationsProvider.notifier)
+                            .syncPendingApplications();
+                        _showSuccessSnackBar('Sync completed successfully');
+                      } catch (e) {
+                        _showErrorSnackBar('Sync failed: ${e.toString()}');
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildToolButton(
+                    icon: Icons.admin_panel_settings,
+                    label: 'Admin Panel',
+                    onPressed: () =>
+                        _navigateWithAnimation(const AdminLoginPage()),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildToolButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: kSecondaryColor,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentActivity() {
+    final applications = ref.watch(applicationsProvider);
+    final recentApplications = applications.take(5).toList();
+
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recent Activity',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: kTextColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (recentApplications.isEmpty)
+              Text(
+                'No recent applications',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  color: kSubtitleColor,
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: recentApplications.length,
+                separatorBuilder: (context, index) => const Divider(),
+                itemBuilder: (context, index) {
+                  final application = recentApplications[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: application.profileImagePath != null
+                          ? FileImage(File(application.profileImagePath!))
+                          : null,
+                      child: application.profileImagePath == null
+                          ? Text(application.name[0])
+                          : null,
+                    ),
+                    title: Text(
+                      application.name,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        color: kTextColor,
+                      ),
+                    ),
+                    subtitle: Text(
+                      application.committee,
+                      style: GoogleFonts.poppins(
+                        color: kSubtitleColor,
+                      ),
+                    ),
+                    trailing: Text(
+                      _formatDate(application.timestamp),
+                      style: GoogleFonts.poppins(
+                        color: kSubtitleColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTributeBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kAccentColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: kAccentColor,
+            child: const Icon(Icons.code, color: Colors.white),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Developed with ❤️ by',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: kSubtitleColor,
+                  ),
+                ),
+                Text(
+                  'Mahmoud Ezzat',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: kTextColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _navigateWithAnimation(Widget page) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOutCubic;
+          var tween =
+              Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          var offsetAnimation = animation.drive(tween);
+          return SlideTransition(position: offsetAnimation, child: child);
+        },
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -624,6 +1086,21 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please select a committee';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _recruiterController,
+                  decoration: const InputDecoration(
+                    labelText: 'Recruiter Name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_add),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the recruiter\'s name';
                     }
                     return null;
                   },
