@@ -1,4 +1,4 @@
-// ignore_for_file: unrelated_type_equality_checks, avoid_print, library_private_types_in_public_api
+// ignore_for_file: unrelated_type_equality_checks, avoid_print, library_private_types_in_public_api, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,15 +9,12 @@ import 'package:lottie/lottie.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-// Add these constants at the top of your file
-// Sophisticated color palette for a professional recruiting tool
 const Color kPrimaryColor = Color(0xFF1E88E5);
 const Color kSecondaryColor = Color(0xFF42A5F5);
 const Color kAccentColor = Color(0xFF64B5F6);
@@ -25,14 +22,10 @@ const Color kBackgroundColor = Color(0xFFF5F5F5);
 const Color kCardColor = Colors.white;
 const Color kTextColor = Color(0xFF333333);
 const Color kSubtitleColor = Color(0xFF757575);
-// const Color kPrimaryColor = Color(0xFFD2B48C);  // Beige
-// const Color kSecondaryColor = Color(0xFFB5A57D);  // Muted beige for secondary elements
-// const Color kAccentColor = Color(0xFF7D674C);  // Darker beige accent
-// const Color kBackgroundColor = Color(0xFFF8F4E3);  // Light beige background
-// const Color kCardColor = Color(0xFFF5F0DC);  // Lighter beige for cards
-// const Color kTextColor = Color(0xFF4B4B4B);  // Darker gray-brown for text
-// const Color kSubtitleColor = Color(0xFF8A7E6D);  // Muted brown-gray for subtitles
 
+final connectivityProvider = StateProvider<ConnectivityResult>((ref) {
+  return ConnectivityResult.none;
+});
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Workmanager().initialize(callbackDispatcher);
@@ -67,7 +60,7 @@ Future<void> syncDataToGoogleSheets() async {
   if (connectivityResult == ConnectivityResult.none) return;
 
   const sheetUrl =
-      'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec';
+      'https://script.google.com/macros/s/AKfycbzedu08QyrQNO410dTL5PGJL-Shu0-DZI4o3DJOVbJaZRODr8-OguumqY1_4OJJeXpC/exec';
 
   for (var appJson in applications) {
     try {
@@ -122,7 +115,7 @@ class RecruiterLeaderboardNotifier extends StateNotifier<List<RecruiterStats>> {
   Future<void> fetchLeaderboard() async {
     try {
       final response = await http.get(Uri.parse(
-          'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec?action=getLeaderboard'));
+          'https://script.google.com/macros/s/AKfycbzedu08QyrQNO410dTL5PGJL-Shu0-DZI4o3DJOVbJaZRODr8-OguumqY1_4OJJeXpC/exec?action=getLeaderboard'));
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         state = data
@@ -226,7 +219,7 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
 
   Future<void> _syncApplicationToGoogleSheets(Application application) async {
     const sheetUrl =
-        'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec';
+        'https://script.google.com/macros/s/AKfycbzedu08QyrQNO410dTL5PGJL-Shu0-DZI4o3DJOVbJaZRODr8-OguumqY1_4OJJeXpC/exec';
     try {
       final response = await http.post(
         Uri.parse(sheetUrl),
@@ -259,7 +252,7 @@ class ApplicationsNotifier extends StateNotifier<List<Application>> {
     }
 
     const sheetUrl =
-        'https://script.google.com/macros/s/AKfycbxdNZe7Qnr5Rr2rEBR_KkOxmkbxa-_YkgH3OWz3-mpdBV30aFdntb3_NvCAQJ4AeA64/exec';
+        'https://script.google.com/macros/s/AKfycbzedu08QyrQNO410dTL5PGJL-Shu0-DZI4o3DJOVbJaZRODr8-OguumqY1_4OJJeXpC/exec';
     List<String> successfulSyncs = [];
 
     for (var appJson in pendingApps) {
@@ -349,11 +342,85 @@ class EnactusRecruitmentApp extends ConsumerWidget {
   }
 }
 
+class OfflineAssetManager {
+  static final OfflineAssetManager _instance = OfflineAssetManager._internal();
+  factory OfflineAssetManager() => _instance;
+  OfflineAssetManager._internal();
+
+  Future<File> getFile(String url) async {
+    final fileInfo = await DefaultCacheManager().getFileFromCache(url);
+    if (fileInfo == null) {
+      return DefaultCacheManager().getSingleFile(url);
+    } else {
+      return fileInfo.file;
+    }
+  }
+
+  Widget cachedNetworkImage(String url) {
+    return FutureBuilder<File>(
+      future: getFile(url),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          return Image.file(snapshot.data!);
+        } else if (snapshot.hasError) {
+          return const Icon(Icons.error);
+        } else {
+          return const CircularProgressIndicator();
+        }
+      },
+    );
+  }
+
+  Widget cachedLottieAnimation(String url) {
+    return FutureBuilder<File>(
+      future: getFile(url),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          return Lottie.file(snapshot.data!);
+        } else if (snapshot.hasError) {
+          return const Icon(Icons.error);
+        } else {
+          return const CircularProgressIndicator();
+        }
+      },
+    );
+  }
+}
+
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 200.0,
+            floating: false,
+            pinned: true,
+            stretch: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  OfflineAssetManager().cachedNetworkImage(
+                    'https://i.postimg.cc/x84T6xRZ/IMG-7344-topaz-faceai-sharpen.jpg',
+                  ),
+                  // ... (keep existing overlay)
+                ],
+              ),
+            ),
+            // ... (keep existing code)
+          ),
+          // ... (keep existing code)
+        ],
+      ),
+    );
+  }
 }
 
 class _HomePageState extends ConsumerState<HomePage>
@@ -533,7 +600,7 @@ class _HomePageState extends ConsumerState<HomePage>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [kPrimaryColor, kSecondaryColor],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -755,9 +822,9 @@ class _HomePageState extends ConsumerState<HomePage>
       ),
       child: Row(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
             backgroundColor: kAccentColor,
-            child: const Icon(Icons.code, color: Colors.white),
+            child: Icon(Icons.code, color: Colors.white),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -832,13 +899,6 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 }
 
-class RegistrationPage extends ConsumerStatefulWidget {
-  const RegistrationPage({super.key});
-
-  @override
-  _RegistrationPageState createState() => _RegistrationPageState();
-}
-
 // Add this new widget
 class RecruiterLeaderboardPage extends ConsumerStatefulWidget {
   const RecruiterLeaderboardPage({super.key});
@@ -881,6 +941,13 @@ class _RecruiterLeaderboardPageState
   }
 }
 
+class RegistrationPage extends ConsumerStatefulWidget {
+  const RegistrationPage({super.key});
+
+  @override
+  _RegistrationPageState createState() => _RegistrationPageState();
+}
+
 class _RegistrationPageState extends ConsumerState<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
@@ -888,11 +955,27 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _recruiterController = TextEditingController();
   final TextEditingController _collegeController = TextEditingController();
+
   String _selectedCommittee = '';
   bool _isLoading = false;
-  File? _profileImage;
   String _selectedEmailSuffix = '@gmail.com';
   List<String> _registeredColleges = [];
+  List<String> _recruiters = [];
+
+  // Default lists for colleges and email suffixes
+  List<String> defaultColleges = [
+    'Harvard University',
+    'Stanford University',
+    'MIT',
+    'University of California, Berkeley'
+  ];
+
+  List<String> defaultEmailSuffixes = [
+    '@gmail.com',
+    '@hotmail.com',
+    '@outlook.com',
+    '@yahoo.com',
+  ];
 
   List<String> committees = [
     'Project',
@@ -905,22 +988,24 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
     'Digital Marketing'
   ];
 
-  List<String> emailSuffixes = [
-    '@gmail.com',
-    '@hotmail.com',
-    '@outlook.com',
-    '@yahoo.com',
-  ];
-
   @override
   void initState() {
     super.initState();
     _loadRegisteredColleges();
+    _loadRecruiters();
   }
 
   void _loadRegisteredColleges() {
     final prefs = ref.read(sharedPreferencesProvider);
-    _registeredColleges = prefs.getStringList('registeredColleges') ?? [];
+    _registeredColleges =
+        prefs.getStringList('registeredColleges') ?? defaultColleges;
+    _registeredColleges =
+        _registeredColleges.toSet().toList(); // Remove duplicates
+  }
+
+  void _loadRecruiters() {
+    final prefs = ref.read(sharedPreferencesProvider);
+    _recruiters = prefs.getStringList('recruiters') ?? [];
   }
 
   @override
@@ -935,19 +1020,6 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundImage: _profileImage != null
-                        ? FileImage(_profileImage!)
-                        : null,
-                    child: _profileImage == null
-                        ? const Icon(Icons.add_a_photo, size: 40)
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
@@ -987,16 +1059,36 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
                     const SizedBox(width: 8),
                     DropdownButton<String>(
                       value: _selectedEmailSuffix,
-                      items: emailSuffixes.map((String suffix) {
-                        return DropdownMenuItem<String>(
-                          value: suffix,
-                          child: Text(suffix),
-                        );
-                      }).toList(),
+                      items: [
+                        ...defaultEmailSuffixes.map((String suffix) {
+                          return DropdownMenuItem<String>(
+                            value: suffix,
+                            child: Text(suffix),
+                          );
+                        }),
+                        const DropdownMenuItem<String>(
+                          value: 'add_new_suffix',
+                          child: Text('Add new...'),
+                        ),
+                      ],
                       onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedEmailSuffix = newValue!;
-                        });
+                        if (newValue == 'add_new_suffix') {
+                          _showAddNewItemDialog(
+                            context: context,
+                            title: 'Add New Email Suffix',
+                            onAdd: (String newSuffix) {
+                              setState(() {
+                                defaultEmailSuffixes.add(newSuffix);
+                                _selectedEmailSuffix = newSuffix;
+                              });
+                              _saveEmailSuffixes();
+                            },
+                          );
+                        } else {
+                          setState(() {
+                            _selectedEmailSuffix = newValue!;
+                          });
+                        }
                       },
                     ),
                   ],
@@ -1021,48 +1113,53 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _registeredColleges.isEmpty
-                    ? TextFormField(
-                        controller: _collegeController,
-                        decoration: const InputDecoration(
-                          labelText: 'College',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.school),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your college name';
-                          }
-                          return null;
-                        },
-                      )
-                    : DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(
-                          labelText: 'College',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.school),
-                        ),
-                        value: _collegeController.text.isNotEmpty
-                            ? _collegeController.text
-                            : null,
-                        items: _registeredColleges.map((String college) {
-                          return DropdownMenuItem<String>(
-                            value: college,
-                            child: Text(college),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'College',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.school),
+                  ),
+                  value: _collegeController.text.isNotEmpty
+                      ? _collegeController.text
+                      : null,
+                  items: [
+                    ..._registeredColleges.map((String college) {
+                      return DropdownMenuItem<String>(
+                        value: college,
+                        child: Text(college),
+                      );
+                    }),
+                    const DropdownMenuItem<String>(
+                      value: 'add_new_college',
+                      child: Text('Add new college...'),
+                    ),
+                  ],
+                  onChanged: (String? newValue) {
+                    if (newValue == 'add_new_college') {
+                      _showAddNewItemDialog(
+                        context: context,
+                        title: 'Add New College',
+                        onAdd: (String newCollege) {
                           setState(() {
-                            _collegeController.text = newValue!;
+                            _registeredColleges.add(newCollege);
+                            _collegeController.text = newCollege;
                           });
+                          _saveRegisteredColleges();
                         },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select your college';
-                          }
-                          return null;
-                        },
-                      ),
+                      );
+                    } else {
+                      setState(() {
+                        _collegeController.text = newValue!;
+                      });
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your college';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
@@ -1124,14 +1221,49 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
     );
   }
 
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _profileImage = File(image.path);
-      });
-    }
+  void _showAddNewItemDialog({
+    required BuildContext context,
+    required String title,
+    required Function(String) onAdd,
+  }) {
+    final TextEditingController controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: "Enter new item"),
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text("Add"),
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  onAdd(controller.text);
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _saveRegisteredColleges() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setStringList('registeredColleges', _registeredColleges);
+  }
+
+  void _saveEmailSuffixes() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setStringList('emailSuffixes', defaultEmailSuffixes);
   }
 
   void _submitForm() async {
@@ -1141,15 +1273,6 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
       });
 
       try {
-        String? profileImagePath;
-        if (_profileImage != null) {
-          final directory = await getApplicationDocumentsDirectory();
-          final imagePath =
-              '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
-          await _profileImage!.copy(imagePath);
-          profileImagePath = imagePath;
-        }
-
         final newApplication = Application(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text,
@@ -1158,7 +1281,7 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
           college: _collegeController.text,
           committee: _selectedCommittee,
           timestamp: DateTime.now(),
-          profileImagePath: profileImagePath,
+          profileImagePath: null,
           recruiter: _recruiterController.text,
         );
 
@@ -1171,6 +1294,13 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
           _registeredColleges.add(_collegeController.text);
           final prefs = ref.read(sharedPreferencesProvider);
           await prefs.setStringList('registeredColleges', _registeredColleges);
+        }
+
+        // Add the recruiter to the list if it's not already there
+        if (!_recruiters.contains(_recruiterController.text)) {
+          _recruiters.add(_recruiterController.text);
+          final prefs = ref.read(sharedPreferencesProvider);
+          await prefs.setStringList('recruiters', _recruiters);
         }
 
         setState(() {
@@ -1196,11 +1326,8 @@ class _RegistrationPageState extends ConsumerState<RegistrationPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Lottie.network(
+              OfflineAssetManager().cachedLottieAnimation(
                 'https://assets10.lottiefiles.com/packages/lf20_wcnjmdp1.json',
-                width: 200,
-                height: 200,
-                fit: BoxFit.contain,
               ),
               const SizedBox(height: 16),
               const Text(
@@ -1329,17 +1456,47 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   }
 }
 
-class AdminDashboardPage extends ConsumerWidget {
+//
+class AdminDashboardPage extends ConsumerStatefulWidget {
   const AdminDashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final applications = ref.watch(applicationsProvider);
+  _AdminDashboardPageState createState() => _AdminDashboardPageState();
+}
 
+class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
+  late Future<Map<String, dynamic>> _analyticsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _analyticsFuture = _fetchAnalytics();
+  }
+
+  Future<Map<String, dynamic>> _fetchAnalytics() async {
+    final response = await http.get(Uri.parse(
+        'https://script.google.com/macros/s/AKfycbzedu08QyrQNO410dTL5PGJL-Shu0-DZI4o3DJOVbJaZRODr8-OguumqY1_4OJJeXpC/exec?action=getAnalytics'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to load analytics');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: Text('Admin Dashboard', style: GoogleFonts.poppins()),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                _analyticsFuture = _fetchAnalytics();
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () =>
@@ -1347,99 +1504,272 @@ class AdminDashboardPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text('Applications Overview',
-                style: Theme.of(context).textTheme.headlineSmall),
-          ),
-          AspectRatio(
-            aspectRatio: 1.70,
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _analyticsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData) {
+            return const Center(child: Text('No data available'));
+          }
+
+          final analytics = snapshot.data!;
+
+          return SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: ApplicationsChart(applications: applications),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildOverviewCards(analytics),
+                  const SizedBox(height: 24),
+                  _buildRecruitmentTrendChart(analytics),
+                  const SizedBox(height: 24),
+                  _buildCommitteeDistributionChart(analytics),
+                  const SizedBox(height: 24),
+                  _buildCollegeDistributionChart(analytics),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Recent Applications',
-              style: Theme.of(context).textTheme.headlineLarge,
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await ref
-                    .read(applicationsProvider.notifier)
-                    .syncPendingApplications();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sync completed successfully')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Sync failed: ${e.toString()}')),
-                );
-              }
-            },
-            child: const Text('Sync Pending Applications'),
-          ),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: applications.length,
-            itemBuilder: (context, index) {
-              final application = applications[index];
-              return ListTile(
-                leading: application.profileImagePath != null
-                    ? CircleAvatar(
-                        backgroundImage:
-                            FileImage(File(application.profileImagePath!)))
-                    : CircleAvatar(child: Text(application.name[0])),
-                title: Text(application.name),
-                subtitle: Text(application.committee),
-                trailing: Text(application.timestamp.toString().split(' ')[0]),
-                onTap: () => _showApplicationDetails(context, application),
-              );
-            },
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  void _showApplicationDetails(BuildContext context, Application application) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Application Details'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (application.profileImagePath != null)
-                  Image.file(File(application.profileImagePath!),
-                      height: 100, width: 100),
-                Text('Name: ${application.name}'),
-                Text('Email: ${application.email}'),
-                Text('Phone: ${application.phone}'),
-                Text('College: ${application.college}'),
-                Text('Committee: ${application.committee}'),
-                Text('Applied on: ${application.timestamp}'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Close'),
-              onPressed: () => Navigator.of(context).pop(),
+  Widget _buildOverviewCards(Map<String, dynamic> analytics) {
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _buildOverviewCard('Total Recruits',
+            analytics['totalRecruits']?.toString() ?? 'N/A', Icons.group),
+        _buildOverviewCard(
+            'This Day',
+            analytics['recruitsThisDay']?.toString() ?? 'N/A',
+            Icons.trending_up),
+      ],
+    );
+  }
+
+  Widget _buildOverviewCard(String title, String value, IconData icon) {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 48, color: Colors.blue),
+            const SizedBox(height: 8),
+            Text(title, style: GoogleFonts.poppins(fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(value,
+                style: GoogleFonts.poppins(
+                    fontSize: 24, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommitteeDistributionChart(Map<String, dynamic> analytics) {
+    final committeeDistribution =
+        analytics['committeeDistribution'] as Map<String, dynamic>?;
+
+    if (committeeDistribution == null || committeeDistribution.isEmpty) {
+      return const Center(
+          child: Text('No committee distribution data available'));
+    }
+
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Committee Distribution',
+                style: GoogleFonts.poppins(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 26),
+            Center(
+              child: SizedBox(
+                height: 400,
+                child: PieChart(
+                  PieChartData(
+                    sectionsSpace: 0,
+                    centerSpaceRadius: 60,
+                    sections: committeeDistribution.entries.map((entry) {
+                      return PieChartSectionData(
+                        color: Colors.primaries[committeeDistribution.keys
+                                .toList()
+                                .indexOf(entry.key) %
+                            Colors.primaries.length],
+                        value: entry.value.toDouble(),
+                        title: '${entry.key}\n${entry.value}',
+                        radius: 120,
+                        titleStyle: GoogleFonts.poppins(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecruitmentTrendChart(Map<String, dynamic> analytics) {
+    final recruitmentTrend = analytics['recruitmentTrend'] as List<dynamic>?;
+
+    if (recruitmentTrend == null || recruitmentTrend.isEmpty) {
+      return const Center(child: Text('No recruitment trend data available'));
+    }
+
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Recruitment Trend',
+                style: GoogleFonts.poppins(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: const FlGridData(show: false),
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          if (value.toInt() >= 0 &&
+                              value.toInt() < recruitmentTrend.length) {
+                            return Text(
+                                recruitmentTrend[value.toInt()]['date']);
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: true),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: recruitmentTrend.asMap().entries.map((entry) {
+                        return FlSpot(entry.key.toDouble(),
+                            entry.value['count'].toDouble());
+                      }).toList(),
+                      isCurved: true,
+                      color: Colors.blue,
+                      barWidth: 4,
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                          show: true, color: Colors.blue.withOpacity(0.2)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollegeDistributionChart(Map<String, dynamic> analytics) {
+    final collegeDistribution =
+        analytics['collegeDistribution'] as Map<String, dynamic>?;
+
+    if (collegeDistribution == null || collegeDistribution.isEmpty) {
+      return const Center(
+          child: Text('No college distribution data available'));
+    }
+
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('College Distribution',
+                style: GoogleFonts.poppins(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 300,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: collegeDistribution.values
+                      .reduce((a, b) => a > b ? a : b)
+                      .toDouble(),
+                  barTouchData: BarTouchData(enabled: false),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          if (value.toInt() >= 0 &&
+                              value.toInt() < collegeDistribution.length) {
+                            return RotatedBox(
+                              quarterTurns: 3,
+                              child: Text(
+                                collegeDistribution.keys
+                                    .elementAt(value.toInt()),
+                                style: GoogleFonts.poppins(fontSize: 8),
+                              ),
+                            );
+                          }
+                          return const Text('');
+                        },
+                        reservedSize: 60,
+                      ),
+                    ),
+                    leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  barGroups: collegeDistribution.entries.map((entry) {
+                    return BarChartGroupData(
+                      x: collegeDistribution.keys.toList().indexOf(entry.key),
+                      barRods: [
+                        BarChartRodData(
+                          toY: entry.value.toDouble(),
+                          color: Colors.lightBlueAccent,
+                          width: 20,
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
